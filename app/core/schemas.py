@@ -2,7 +2,7 @@ from datetime import datetime
 
 
 class IdMixin:
-    id: int
+    id: int | None = None
 
 
 class CreatedUpdatedMixin:
