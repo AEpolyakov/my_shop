@@ -2,7 +2,7 @@ from typing import Generic, Type
 
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.exceptions import HTTPException
 from typing_extensions import TypeVar
@@ -27,10 +27,15 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         return obj
 
-    async def get_many(self, db: AsyncSession, *, skip: int = 0, limit: int = 100) -> list[ModelType]:
+    async def get_many(self, db: AsyncSession, skip: int = 0, limit: int = 100) -> dict:
 
         results = (await db.scalars(select(self.model).offset(skip).limit(limit))).all()
-        return results
+        total = (await db.execute(select(func.count()).select_from(self.model))).scalar_one()
+
+        return {
+            "results": results,
+            "total": total,
+        }
 
     async def create(self, obj: CreateSchemaType, db: AsyncSession) -> ModelType:
 
@@ -56,6 +61,8 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         old_obj = await self.get_one(item_id, db)
         update_data = jsonable_encoder(new_obj_schema)
         update_data.pop('id')
+        update_data.pop('created')
+        update_data.pop('updated')
 
         for field in update_data:
             setattr(old_obj, field, update_data[field])

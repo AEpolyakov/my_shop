@@ -15,11 +15,11 @@ async def get_product(product_id: int, db: Session = Depends(get_db)):
 
 
 @product_router.get("/")
-async def get_products(db: Session = Depends(get_db)):
-    return await product_service.get_many(db)
+async def get_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return await product_service.get_many(db, skip, limit)
 
 
-@product_router.post("/")
+@product_router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_product(product: ProductCreateSchema, db: Session = Depends(get_db)):
     return await product_service.create(product, db)
 
