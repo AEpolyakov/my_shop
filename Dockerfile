@@ -2,9 +2,12 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+COPY pyproject.toml poetry.lock ./
+
+RUN pip install poetry
+
+RUN poetry config virtualenvs.create false && poetry install --no-root
 
 COPY . .
 
-EXPOSE ${APP_PORT}
+CMD ["poetry", "run", "alembic", "upgrade", "head"]
