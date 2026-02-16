@@ -2,7 +2,7 @@ from typing import Generic, Type
 
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
-from sqlalchemy import select, delete, func
+from sqlalchemy import select, delete, func, Select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.exceptions import HTTPException
 from typing_extensions import TypeVar
@@ -21,7 +21,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
     async def get_one(self, item_id: int, db: AsyncSession) -> ModelType | None:
 
-        obj = (await db.execute(select(self.model).where(self.model.id == item_id))).scalar()
+        obj = (await db.execute(self.base_select.where(self.model.id == item_id))).scalar()
         if obj is None:
             raise HTTPException(status_code=404, detail=f"item id={item_id} from {self.model.__tablename__} not found")
 
@@ -29,7 +29,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
     async def get_many(self, db: AsyncSession, skip: int = 0, limit: int = 100) -> dict:
 
-        results = (await db.scalars(select(self.model).offset(skip).limit(limit))).all()
+        results = (await db.scalars(self.base_select.offset(skip).limit(limit))).all()
         total = (await db.execute(select(func.count()).select_from(self.model))).scalar_one()
 
         return {
@@ -71,3 +71,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         await db.commit()
 
         return old_obj
+
+    @property
+    def base_select(self) -> Select:
+        return select(self.model)
