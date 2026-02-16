@@ -60,9 +60,9 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         old_obj = await self.get_one(item_id, db)
         update_data = jsonable_encoder(new_obj_schema)
-        update_data.pop('id')
-        update_data.pop('created')
-        update_data.pop('updated')
+        update_data.pop("id")
+        update_data.pop("created")
+        update_data.pop("updated")
 
         for field in update_data:
             setattr(old_obj, field, update_data[field])
