@@ -2,7 +2,7 @@ from typing import Generic, Type
 
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
-from sqlalchemy import select, delete, func, Select
+from sqlalchemy import select, delete, func, Select, asc
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.exceptions import HTTPException
 from typing_extensions import TypeVar
@@ -29,7 +29,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
     async def get_many(self, db: AsyncSession, skip: int = 0, limit: int = 100) -> dict:
 
-        results = (await db.scalars(self.base_select.offset(skip).limit(limit))).all()
+        results = (await db.scalars(self.base_select.offset(skip).limit(limit).order_by(asc(self.model.id)))).all()
         total = (await db.execute(select(func.count()).select_from(self.model))).scalar_one()
 
         return {
