@@ -1,6 +1,18 @@
+import pytest
 from sqlalchemy import select
 
 from app.product.models import Product
+
+
+@pytest.fixture
+async def inserted_product(product_list: list[dict], db_session):
+    product_dict = product_list[0]
+
+    product = Product(**product_dict)
+    db_session.add(product)
+    await db_session.commit()
+
+    return product
 
 
 class TestProducts:
@@ -46,18 +58,19 @@ class TestProducts:
         product_response = response.json()
         assert len(product_response["results"]) == len(product_list) - skip
 
-    async def test_update_product(self, client, db_session, product_list):
+    async def test_update_product(self, client, db_session, product_list, inserted_product):
 
-        product_dict = product_list[0]
         update_product_dict = product_list[1]
 
-        product = Product(**product_dict)
-        db_session.add(product)
-        await db_session.commit()
-
-        response = await client.put(f"/products/{product.id}", json=update_product_dict)
+        response = await client.put(f"/products/{inserted_product.id}", json=update_product_dict)
         assert response.status_code == 200
         data = response.json()
         assert data["name"] == update_product_dict["name"]
         assert data["price"] == update_product_dict["price"]
-        assert data["id"] == product.id
+        assert data["category_id"] == update_product_dict["category_id"]
+        assert data["id"] == inserted_product.id
+
+    async def test_delete_product(self, client, db_session, product_list, inserted_product):
+
+        response = await client.delete(f"/products/{inserted_product.id}")
+        assert response.status_code == 204

@@ -66,13 +66,16 @@ def product_list() -> list[dict]:
         {
             "name": "product1",
             "price": 111,
+            "category_id": None,
         },
         {
             "name": "product2",
             "price": 222,
+            "category_id": 1,
         },
         {
             "name": "product3",
             "price": 333,
+            "category_id": None,
         },
     ]
