@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 
 from app.category.schemas import CategoryCreateSchema
+from app.core.schemas import ResponseModel
 
 
 class ProductCreateSchema(BaseModel):
@@ -12,3 +13,12 @@ class ProductCreateSchema(BaseModel):
 
 class ProductUpdateSchema(ProductCreateSchema):
     pass
+
+
+class ProductResponseSchema(ProductUpdateSchema):
+    id: int
+
+
+class ProductsResponseSchema(BaseModel):
+    results: list[ProductResponseSchema]
+    total: int

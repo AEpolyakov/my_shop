@@ -7,7 +7,6 @@ from app.core.crud import CRUDBase
 
 
 class CategoryService(CRUDBase[Category, CategoryCreateSchema, CategoryUpdateSchema]):
-    pass
 
     async def get_or_create_by_name(self, category_name: str, db: AsyncSession) -> Category:
         category = await db.scalar(select(Category).where(Category.name == category_name))
