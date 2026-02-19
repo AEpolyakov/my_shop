@@ -15,8 +15,8 @@ class ProductUpdateSchema(ProductCreateSchema):
     pass
 
 
-class ProductResponseSchema(ProductUpdateSchema):
-    id: int
+class ProductResponseSchema(ProductUpdateSchema, ResponseModel):
+    pass
 
 
 class ProductsResponseSchema(BaseModel):
