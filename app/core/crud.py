@@ -2,7 +2,7 @@ from typing import Generic, Type
 
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
-from sqlalchemy import select, delete, func, Select, asc
+from sqlalchemy import select, func, Select, asc
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.exceptions import HTTPException
 from typing_extensions import TypeVar
@@ -21,7 +21,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
     async def get_one(self, item_id: int, db: AsyncSession) -> ModelType | None:
 
-        obj = (await db.execute(self.base_select.where(self.model.id == item_id))).scalar()
+        obj = (await db.execute(self._base_select.where(self.model.id == item_id))).scalar()
         if obj is None:
             raise HTTPException(status_code=404, detail=f"item id={item_id} from {self.model.__tablename__} not found")
 
@@ -29,8 +29,10 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
     async def get_many(self, db: AsyncSession, skip: int = 0, limit: int = 100) -> dict:
 
-        results = (await db.scalars(self.base_select.offset(skip).limit(limit).order_by(asc(self.model.id)))).all()
-        total = (await db.execute(select(func.count()).select_from(self.model))).scalar_one()
+        results = (await db.scalars(self._base_select.offset(skip).limit(limit).order_by(asc(self.model.id)))).all()
+        total = (
+            await db.execute(select(func.count()).where(self.model.deleted == False).select_from(self.model))
+        ).scalar_one()
 
         return {
             "results": results,
@@ -47,10 +49,10 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
     async def delete(self, db: AsyncSession, item_id: int) -> None:
 
-        obj = (await db.execute(delete(self.model).where(self.model.id == item_id).returning(self.model))).scalar()
+        obj = await self.get_one(item_id, db)
+        obj.deleted = True
 
-        if not obj:
-            raise HTTPException(status_code=404, detail=f"item id={item_id} not found")
+        db.add(obj)
 
         await db.commit()
 
@@ -72,3 +74,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     @property
     def base_select(self) -> Select:
         return select(self.model)
+
+    @property
+    def _base_select(self) -> Select:
+        return self.base_select.where(self.model.deleted == False)
