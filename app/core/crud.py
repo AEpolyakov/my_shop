@@ -68,6 +68,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         db.add(old_obj)
         await db.commit()
+        await db.refresh(old_obj)
 
         return old_obj
 
