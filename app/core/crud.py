@@ -1,4 +1,4 @@
-from typing import Generic, Type
+from typing import Generic, Type, NoReturn
 
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
@@ -23,9 +23,13 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         obj = (await db.execute(self._base_select.where(self.model.id == item_id))).scalar()
         if obj is None:
-            raise HTTPException(status_code=404, detail=f"item id={item_id} from {self.model.__tablename__} not found")
+            self.raise404(item_id)
 
         return obj
+
+    @staticmethod
+    def raise404(item_id: int, table_name: str) -> NoReturn:
+        raise HTTPException(status_code=404, detail=f"item id={item_id} from {table_name} not found")
 
     async def get_many(self, db: AsyncSession, skip: int = 0, limit: int = 100) -> dict:
 
