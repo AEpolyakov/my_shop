@@ -12,3 +12,5 @@ class Product(Base):
 
     category_id = Column(ForeignKey("categories.id"), nullable=True)
     category = relationship("Category", back_populates="products")
+
+    cart_products = relationship("CartProduct", back_populates="product", cascade="all, delete-orphan")
