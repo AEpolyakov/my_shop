@@ -10,6 +10,6 @@ class ResponseModel(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    @field_serializer('created', 'updated')
+    @field_serializer("created", "updated")
     def serialize_datetime(self, value: datetime, _info):
-        return value.strftime('%Y-%m-%d %H:%M:%S')
+        return value.strftime("%Y-%m-%d %H:%M:%S")
