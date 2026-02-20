@@ -9,5 +9,3 @@ RUN pip install poetry
 RUN poetry config virtualenvs.create false && poetry install --no-root
 
 COPY . .
-
-CMD ["poetry", "run", "alembic", "upgrade", "head"]
