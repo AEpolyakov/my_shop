@@ -23,7 +23,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         obj = (await db.execute(self._base_select.where(self.model.id == item_id))).scalar()
         if obj is None:
-            self.raise404(item_id)
+            self.raise404(item_id, self.model.__tablename__)
 
         return obj
 
