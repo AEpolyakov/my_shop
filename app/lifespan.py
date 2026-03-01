@@ -4,8 +4,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.config import settings
-from app.rabbit_consumer import RabbitMQConsumer
-from app.rabbit_producer import RabbitMQProducer
+from app.rabbit.consumer import RabbitMQConsumer
+from app.rabbit.producer import RabbitMQProducer
 
 rabbit_consumer = RabbitMQConsumer(settings.RABBIT_URL, settings.RABBIT_PREFETCH_COUNT)
 rabbit_producer = RabbitMQProducer(settings.RABBIT_URL)
