@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     RABBIT_QUEUE: str = "product"
     RABBIT_USER: str = "guest"
     RABBIT_PASS: str = "guest"
+    RABBIT_PREFETCH_COUNT: int = 1
 
     @property
     def RABBIT_URL(self) -> str:
