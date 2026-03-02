@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     def RABBIT_URL(self) -> str:
         return f"amqp://{self.RABBIT_USER}:{self.RABBIT_PASS}@{self.RABBIT_HOST}:{self.RABBIT_PORT}/"
 
+    KAFKA_BOOTSTRAP_SERVERS: str
+    KAFKA_TOPIC: str
+    KAFKA_CONSUMER_GROUP_ID: str
+
     model_config = SettingsConfigDict(extra="ignore", env_file=".env", case_sensitive=True)
 
 

@@ -37,6 +37,45 @@ services:
       timeout: 5s
       retries: 5
 
+  kafka:
+    image: apache/kafka:latest
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      # Режим KRaft (без ZooKeeper)
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:9093'
+
+      # Слушатели
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+
+      # Директории для данных
+      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+
+      # Топики
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+
+      # Cluster ID (обязательно для KRaft)
+      CLUSTER_ID: 'Mk3OEYxNjIwNDQ0NTY3OQ=='
+    # Убираем healthcheck или делаем его более простым
+    healthcheck:
+      test: ["CMD", "bash", "-c", "nc -z localhost 9092"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+    networks:
+      - app-network
+    extra_hosts:
+      - "kafka:127.0.0.1"
+
   web:
     env_file:
       - .env
@@ -50,8 +89,14 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
     networks:
       - app-network
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: product
+      KAFKA_CONSUMER_GROUP_ID: product_group
 
 volumes:
   postgres_data:
