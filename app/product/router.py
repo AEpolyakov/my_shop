@@ -13,7 +13,9 @@ from app.category.service import category_service
 from app.config import settings
 from app.core.router import create_crud_router, CrudRouterTypes
 from app.core.session import get_db
-from app.lifespan import get_rabbit_producer
+from app.kafka.message import Message
+from app.kafka.producer import KafkaProducer
+from app.lifespan import get_rabbit_producer, get_kafka_producer
 from app.product.schemas import ProductsResponseSchema, ProductResponseSchema, ProductCreateSchema, ProductUpdateSchema
 from app.product.service import product_service
 from app.rabbit.producer import RabbitMQProducer
@@ -56,6 +58,20 @@ async def send_products(
         return {"status": "success", "message": f"All products sent"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@product_router.post("/kafka_send")
+async def send_products(message: Message, producer: KafkaProducer = Depends(get_kafka_producer)):
+    if not producer:
+        raise HTTPException(status_code=500, detail="Kafka producer not initialized")
+
+    try:
+        result = await producer.send_message(topic=message.topic, message="mes: 123123", key=message.partition_key)
+
+        return {"status": "success", "topic": result.topic, "partition": result.partition, "offset": result.offset}
+    except Exception as e:
+        # logger.error(f"Failed to send message: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to send message: {str(e)}")
 
 
 @product_router.post("/mass_create")
