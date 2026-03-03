@@ -5,8 +5,6 @@ from aio_pika import connect_robust, Message
 from aio_pika.abc import AbstractRobustConnection, DeliveryMode
 from pydantic import BaseModel
 
-from app.config import settings
-
 
 class RabbitMQProducer:
     def __init__(self, url: str):
