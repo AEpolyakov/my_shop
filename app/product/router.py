@@ -1,21 +1,22 @@
 import asyncio
 from typing import Annotated
 
-from fastapi import Body
-from fastapi.params import Depends
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncConnection
+from fastapi import Body, Path
+from fastapi.params import Depends, Query
+from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 from starlette.exceptions import HTTPException
 
 from app.category.models import Category
 from app.category.schemas import CategoryCreateSchema
-from app.category.service import category_service
 from app.config import settings
 from app.core.router import create_crud_router, CrudRouterTypes
-from app.core.session import get_db
+from app.core.session import get_db, AsyncSessionLocal
 from app.kafka.message import Message
 from app.kafka.producer import KafkaProducer
 from app.lifespan import get_rabbit_producer, get_kafka_producer
+from app.product.models import Product
 from app.product.schemas import ProductsResponseSchema, ProductResponseSchema, ProductCreateSchema, ProductUpdateSchema
 from app.product.service import product_service
 from app.rabbit.producer import RabbitMQProducer
@@ -27,6 +28,35 @@ product_router = create_crud_router(
     types=CrudRouterTypes(ProductCreateSchema, ProductUpdateSchema, ProductResponseSchema, ProductsResponseSchema),
 )
 
+
+@product_router.get("/search")
+async def search_product(
+        name: str | None = None,
+        price: float | None = None,
+        category_name: str | None = None,
+        db: AsyncSessionLocal = Depends(get_db)):
+
+    def apply_filters(st: select, name: str | None = None, price: float | None = None, category_name: str | None = None):
+        if category_name:
+            st = st.join(Product.category).where(Category.name.ilike(f"%{category_name}%"))
+
+        if name:
+            st = st.where(Product.name.ilike(f"%{name}%"))
+
+        if price:
+            st = st.where(Product.price == price)
+
+        return st
+
+    st_results = apply_filters(select(Product), name=name, price=price, category_name=category_name)
+
+    total = await db.scalar(select(func.count()).select_from(st_results.subquery()))
+    results = (await db.scalars(st_results.limit(100))).all()
+
+    return {
+        'results': results,
+        'total': total,
+    }
 
 @product_router.post("/send")
 async def send_products(producer: RabbitMQProducer = Depends(get_rabbit_producer)):
@@ -42,7 +72,7 @@ async def send_products(producer: RabbitMQProducer = Depends(get_rabbit_producer
 
 @product_router.post("/send_all")
 async def send_products(
-    producer: RabbitMQProducer = Depends(get_rabbit_producer), db: AsyncConnection = Depends(get_db)
+    producer: RabbitMQProducer = Depends(get_rabbit_producer), db: AsyncSessionLocal = Depends(get_db)
 ):
     results = await product_service.get_many(db)
     products = results["results"]
@@ -78,7 +108,7 @@ async def send_products(message: Message, producer: KafkaProducer = Depends(get_
 async def mass_create(
     product_count: Annotated[int, Body()],
     category_count: Annotated[int, Body()],
-    db: AsyncConnection = Depends(get_db),
+    db: AsyncSessionLocal = Depends(get_db),
 ):
     import random
     import string
@@ -98,18 +128,14 @@ async def mass_create(
 
         return random.choice(id_list)
 
-    for i in range(category_count):
-        await category_service.create(CategoryCreateSchema(name=get_random_str()), db=db)
+    categories_to_create = [Category(name=get_random_str()) for _ in range(category_count)]
+    db.add_all(categories_to_create)
+    await db.commit()
 
     s = await db.scalars(select(Category.id))
     category_ids = list(s.all())
 
-    for i in range(product_count):
-        await product_service.create(
-            ProductCreateSchema(
-                name=get_random_str(),
-                price=random.random(),
-                category_id=get_random_id(category_ids),
-            ),
-            db=db,
-        )
+    products_to_create = [Product(name=get_random_str(), price=random.random(), category_id=get_random_id(category_ids)) for _ in range(product_count)]
+
+    db.add_all(products_to_create)
+    await db.commit()
