@@ -30,6 +30,7 @@ class KafkaConsumer:
             value_deserializer=lambda m: json.loads(m.decode("utf-8")),
             auto_offset_reset="earliest",
             enable_auto_commit=True,
+            max_partition_fetch_bytes=1048576 * 10,  # лимит (10 MB)
         )
         await self.consumer.start()
         logger.info(f"Kafka consumer started for topic: {self.topic}")

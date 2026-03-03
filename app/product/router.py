@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from typing import Annotated
 
 from fastapi import Body, Path
@@ -21,6 +22,8 @@ from app.product.schemas import ProductsResponseSchema, ProductResponseSchema, P
 from app.product.service import product_service
 from app.rabbit.producer import RabbitMQProducer
 
+
+logger = logging.getLogger(__name__)
 product_router = create_crud_router(
     prefix="/products",
     tags=["products"],
@@ -92,13 +95,12 @@ async def send_products(
 
 @product_router.post("/kafka_send")
 async def send_products(message: Message, producer: KafkaProducer = Depends(get_kafka_producer)):
-    if not producer:
-        raise HTTPException(status_code=500, detail="Kafka producer not initialized")
+    logger.warning(f'kafka send {message=}')
 
     try:
-        result = await producer.send_message(topic=message.topic, message="mes: 123123", key=message.partition_key)
+        result = await producer.send_message(topic=message.topic, value={"mes": 123123}, key=message.partition_key)
 
-        return {"status": "success", "topic": result.topic, "partition": result.partition, "offset": result.offset}
+        return {"status": "success", **result}
     except Exception as e:
         # logger.error(f"Failed to send message: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to send message: {str(e)}")
