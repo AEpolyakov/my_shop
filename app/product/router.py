@@ -2,21 +2,16 @@ import asyncio
 import logging
 from typing import Annotated
 
-from fastapi import Body, Path
-from fastapi.params import Depends, Query
+from fastapi import Body
+from fastapi.params import Depends
 from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
 from starlette.exceptions import HTTPException
 
 from app.category.models import Category
-from app.category.schemas import CategoryCreateSchema
 from app.config import settings
 from app.core.router import create_crud_router, CrudRouterTypes
 from app.core.session import get_db, AsyncSessionLocal
-from app.kafka.message import Message
-from app.kafka.producer import KafkaProducer
-from app.lifespan import get_rabbit_producer, get_kafka_producer
+from app.lifespan import get_rabbit_producer
 from app.product.models import Product
 from app.product.schemas import ProductsResponseSchema, ProductResponseSchema, ProductCreateSchema, ProductUpdateSchema
 from app.product.service import product_service
@@ -91,19 +86,6 @@ async def send_products(
         return {"status": "success", "message": f"All products sent"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@product_router.post("/kafka_send")
-async def send_products(message: Message, producer: KafkaProducer = Depends(get_kafka_producer)):
-    logger.warning(f'kafka send {message=}')
-
-    try:
-        result = await producer.send_message(topic=message.topic, value={"mes": 123123}, key=message.partition_key)
-
-        return {"status": "success", **result}
-    except Exception as e:
-        # logger.error(f"Failed to send message: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to send message: {str(e)}")
 
 
 @product_router.post("/mass_create")

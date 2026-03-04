@@ -89,10 +89,6 @@ services:
         condition: service_healthy
     networks:
       - app-network
-    environment:
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      KAFKA_TOPIC: product
-      KAFKA_CONSUMER_GROUP_ID: product_group
 
 volumes:
   postgres_data:
