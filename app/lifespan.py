@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.config import settings
-from app.kafka.consumer import KafkaConsumer
+from app.kafka.consumer import kafka_consumer
 from app.kafka.producer import KafkaProducer, kafka_producer
 from app.rabbit.consumer import RabbitMQConsumer
 from app.rabbit.producer import RabbitMQProducer
@@ -45,18 +45,11 @@ async def handle_message(message):
 @asynccontextmanager
 async def manage_kafka():
     await kafka_producer.start()
-    # kafka_consumer = KafkaConsumer(
-    #     bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
-    #     group_id=settings.KAFKA_CONSUMER_GROUP_ID,
-    #     topic=settings.KAFKA_TOPIC,
-    # )
-    # await kafka_consumer.start(message_handler=handle_message)
+    await kafka_consumer.start(message_handler=handle_message)
 
     yield
 
-    # if kafka_consumer:
-    #     await kafka_consumer.stop()
-
+    await kafka_consumer.stop()
     await kafka_producer.stop()
 
 
