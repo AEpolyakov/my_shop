@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from typing import Annotated
 
@@ -6,17 +5,13 @@ from fastapi import Body
 from fastapi.params import Depends
 from sqlalchemy import select, func, Select
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.exceptions import HTTPException
 
 from app.category.models import Category
-from app.config import settings
 from app.core.router import create_crud_router, CrudRouterTypes
 from app.core.session import get_db
-from app.lifespan import get_rabbit_producer
 from app.product.models import Product
 from app.product.schemas import ProductsResponseSchema, ProductResponseSchema, ProductCreateSchema, ProductUpdateSchema
 from app.product.service import product_service
-from app.rabbit.producer import RabbitMQProducer
 
 logger = logging.getLogger(__name__)
 product_router = create_crud_router(
@@ -58,36 +53,6 @@ async def search_product(
         "results": results,
         "total": total,
     }
-
-
-@product_router.post("/send")
-async def send_products(producer: RabbitMQProducer = Depends(get_rabbit_producer)):
-    try:
-        await producer.publish_message(
-            message="123",
-            routing_key=settings.RABBIT_QUEUE,
-        )
-        return {"status": "success", "message": f"Task sent to queue", "task_id": 123}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@product_router.post("/send_all")
-async def send_products(producer: RabbitMQProducer = Depends(get_rabbit_producer), db: AsyncSession = Depends(get_db)):
-    results = await product_service.get_many(db)
-    products = results["results"]
-
-    try:
-        await asyncio.gather(
-            *[
-                producer.publish_message(message=str(product), routing_key=settings.RABBIT_QUEUE)
-                for product in products
-            ]
-        )
-
-        return {"status": "success", "message": f"All products sent"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @product_router.post("/mass_create")

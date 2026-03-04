@@ -1,5 +1,6 @@
 import asyncio
 import json
+from contextlib import asynccontextmanager
 
 from aio_pika import connect_robust
 from aio_pika.abc import AbstractRobustConnection, AbstractIncomingMessage
@@ -22,9 +23,9 @@ class RabbitMQConsumer:
             self.connection = await connect_robust(self.url)
             self.channel = await self.connection.channel()
             await self.channel.set_qos(prefetch_count=self.prefetch_count)
-            print("✅ Consumer connected to RabbitMQ")
+            print("Consumer connected to RabbitMQ")
         except Exception as e:
-            print(f"❌ Failed to connect to RabbitMQ: {e}")
+            print(f"Failed to connect to RabbitMQ: {e}")
             raise
 
     async def close(self):
@@ -34,7 +35,7 @@ class RabbitMQConsumer:
 
         if self.connection and not self.connection.is_closed:
             await self.connection.close()
-            print("🔌 Consumer disconnected from RabbitMQ")
+            print("Consumer disconnected from RabbitMQ")
 
     async def declare_queue(
         self, queue_name: str, durable: bool = True, exclusive: bool = False, auto_delete: bool = False
@@ -46,7 +47,7 @@ class RabbitMQConsumer:
         self.queue = await self.channel.declare_queue(
             name=queue_name, durable=durable, exclusive=exclusive, auto_delete=auto_delete
         )
-        print(f"📦 Queue '{queue_name}' declared")
+        print(f"Queue '{queue_name}' declared")
         return self.queue
 
     async def process_message(self, message: AbstractIncomingMessage):
@@ -57,23 +58,12 @@ class RabbitMQConsumer:
 
                 try:
                     data = json.loads(body)
-                    print(f"📨 Received message: {json.dumps(data, indent=2, ensure_ascii=False)}")
+                    print(f"Received message: {json.dumps(data, indent=2, ensure_ascii=False)}")
                 except json.JSONDecodeError:
-                    print(f"📨 Received message (raw): {body}")
-
-                print(f"📋 Message properties:")
-                print(f"  - Routing key: {message.routing_key}")
-                print(f"  - Content type: {message.content_type}")
-                print(f"  - Message ID: {message.message_id}")
-                print(f"  - Timestamp: {message.timestamp}")
-                print(f"  - Headers: {message.headers}")
-
-                await asyncio.sleep(0.1)
-
-                print("✅ Message processed successfully")
+                    print(f"Received message (raw): {body}")
 
             except Exception as e:
-                print(f"❌ Error processing message: {e}")
+                print(f"Error processing message: {e}")
                 raise
 
     async def start_consuming(self, queue_name: str):
@@ -81,9 +71,28 @@ class RabbitMQConsumer:
         await self.declare_queue(queue_name)
 
         self.consumer_tag = await self.queue.consume(self.process_message)
-        print(f"👂 Started consuming from queue '{queue_name}'")
+        print(f"Started consuming from queue '{queue_name}'")
 
         try:
             await asyncio.Future()
         except asyncio.CancelledError:
-            print("👋 Consumer stopped")
+            print("Consumer stopped")
+
+
+rabbit_consumer = RabbitMQConsumer(settings.RABBIT_URL, settings.RABBIT_PREFETCH_COUNT)
+
+
+@asynccontextmanager
+async def manage_rabbit_consumers():
+
+    await rabbit_consumer.connect()
+    consumer_tasks = [
+        asyncio.create_task(rabbit_consumer.start_consuming(settings.RABBIT_QUEUE)),
+    ]
+
+    yield
+
+    for task in consumer_tasks:
+        task.cancel()
+    await asyncio.gather(*consumer_tasks, return_exceptions=True)
+    await rabbit_consumer.close()
