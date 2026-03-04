@@ -15,7 +15,7 @@ kafka_router = APIRouter(
 
 @kafka_router.post("/send")
 async def send_products(message: Message, producer: KafkaProducer = Depends(get_kafka_producer)):
-    logger.warning(f'kafka send {message=}')
+    logger.warning(f"kafka send {message=}")
 
     try:
         result = await producer.send_message(topic=message.topic, value={"mes": 123123}, key=message.partition_key)
@@ -36,17 +36,19 @@ async def consumer_status():
         for tp in assignment:
             position = await kafka_consumer.consumer.position(tp)
             committed = await kafka_consumer.consumer.committed(tp)
-            partitions.append({
-                "topic": tp.topic,
-                "partition": tp.partition,
-                "current_offset": position,
-                "committed_offset": committed
-            })
+            partitions.append(
+                {
+                    "topic": tp.topic,
+                    "partition": tp.partition,
+                    "current_offset": position,
+                    "committed_offset": committed,
+                }
+            )
 
     return ConsumerStatus(
         running=kafka_consumer._running,
         topic=kafka_consumer.topic,
         group_id=kafka_consumer.group_id,
         auto_commit=kafka_consumer.enable_auto_commit,
-        partitions=partitions
+        partitions=partitions,
     )

@@ -79,7 +79,7 @@ services:
     ports:
       - "${APP_PORT}:${APP_PORT}"
     command: >
-      sh -c "poetry run alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT}"
+      sh -c "poetry run alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT} --log-level ${LOG_LEVEL}"
     depends_on:
       db:
         condition: service_healthy

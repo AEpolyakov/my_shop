@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+from contextlib import asynccontextmanager
 
 from aiokafka import AIOKafkaProducer
 
@@ -22,10 +23,10 @@ class KafkaProducer:
                 self.producer = AIOKafkaProducer(
                     bootstrap_servers=self.bootstrap_servers,
                     client_id="fastapi-producer",
-                    value_serializer=lambda v: json.dumps(v).encode('utf-8'),
-                    key_serializer=lambda k: k.encode('utf-8') if k else None,
+                    value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+                    key_serializer=lambda k: k.encode("utf-8") if k else None,
                     max_request_size=1048576,  # 1MB
-                    acks='all',  # Wait for all replicas to acknowledge
+                    acks="all",  # Wait for all replicas to acknowledge
                     retry_backoff_ms=500,
                     request_timeout_ms=40000,
                 )
@@ -45,29 +46,36 @@ class KafkaProducer:
 
         try:
             # Send message
-            future = await self.producer.send(
-                topic=topic,
-                value=value,
-                key=key
-            )
+            future = await self.producer.send(topic=topic, value=value, key=key)
 
             # Wait for the message to be sent
             result = await future
 
-            logger.info(f"Message sent successfully: topic={result.topic}, "
-                        f"partition={result.partition}, offset={result.offset}")
+            logger.info(
+                f"Message sent successfully: topic={result.topic}, "
+                f"partition={result.partition}, offset={result.offset}"
+            )
 
             return {
-                'topic': result.topic,
-                'partition': result.partition,
-                'offset': result.offset,
-                'timestamp': result.timestamp
+                "topic": result.topic,
+                "partition": result.partition,
+                "offset": result.offset,
+                "timestamp": result.timestamp,
             }
         except Exception as e:
             logger.error(f"Failed to send message: {e}")
             raise
 
+
 kafka_producer = KafkaProducer(settings.KAFKA_BOOTSTRAP_SERVERS)
+
 
 def get_kafka_producer():
     return kafka_producer
+
+
+@asynccontextmanager
+async def manage_kafka_producer():
+    await kafka_producer.start()
+    yield
+    await kafka_producer.stop()

@@ -5,8 +5,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.config import settings
-from app.kafka.consumer import kafka_consumer
-from app.kafka.producer import KafkaProducer, kafka_producer
+from app.kafka.consumer import manage_kafka_consumer
+from app.kafka.producer import KafkaProducer, kafka_producer, manage_kafka_producer
 from app.rabbit.consumer import RabbitMQConsumer
 from app.rabbit.producer import RabbitMQProducer
 
@@ -38,24 +38,9 @@ async def manage_rabbit():
     await rabbit_consumer.close()
 
 
-async def handle_message(message):
-    logger.info(f"handling {message=}")
-
-
-@asynccontextmanager
-async def manage_kafka():
-    await kafka_producer.start()
-    await kafka_consumer.start(message_handler=handle_message)
-
-    yield
-
-    await kafka_consumer.stop()
-    await kafka_producer.stop()
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with manage_kafka(), manage_rabbit():
+    async with manage_kafka_producer(), manage_kafka_consumer(), manage_rabbit():
         yield
 
 

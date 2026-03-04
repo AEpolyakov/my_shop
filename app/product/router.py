@@ -4,19 +4,19 @@ from typing import Annotated
 
 from fastapi import Body
 from fastapi.params import Depends
-from sqlalchemy import select, func
+from sqlalchemy import select, func, Select
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.exceptions import HTTPException
 
 from app.category.models import Category
 from app.config import settings
 from app.core.router import create_crud_router, CrudRouterTypes
-from app.core.session import get_db, AsyncSessionLocal
+from app.core.session import get_db
 from app.lifespan import get_rabbit_producer
 from app.product.models import Product
 from app.product.schemas import ProductsResponseSchema, ProductResponseSchema, ProductCreateSchema, ProductUpdateSchema
 from app.product.service import product_service
 from app.rabbit.producer import RabbitMQProducer
-
 
 logger = logging.getLogger(__name__)
 product_router = create_crud_router(
@@ -29,12 +29,15 @@ product_router = create_crud_router(
 
 @product_router.get("/search")
 async def search_product(
-        name: str | None = None,
-        price: float | None = None,
-        category_name: str | None = None,
-        db: AsyncSessionLocal = Depends(get_db)):
+    name: str | None = None,
+    price: float | None = None,
+    category_name: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
 
-    def apply_filters(st: select, name: str | None = None, price: float | None = None, category_name: str | None = None):
+    def apply_filters(
+        st: Select, name: str | None = None, price: float | None = None, category_name: str | None = None
+    ):
         if category_name:
             st = st.join(Product.category).where(Category.name.ilike(f"%{category_name}%"))
 
@@ -52,9 +55,10 @@ async def search_product(
     results = (await db.scalars(st_results.limit(100))).all()
 
     return {
-        'results': results,
-        'total': total,
+        "results": results,
+        "total": total,
     }
+
 
 @product_router.post("/send")
 async def send_products(producer: RabbitMQProducer = Depends(get_rabbit_producer)):
@@ -69,9 +73,7 @@ async def send_products(producer: RabbitMQProducer = Depends(get_rabbit_producer
 
 
 @product_router.post("/send_all")
-async def send_products(
-    producer: RabbitMQProducer = Depends(get_rabbit_producer), db: AsyncSessionLocal = Depends(get_db)
-):
+async def send_products(producer: RabbitMQProducer = Depends(get_rabbit_producer), db: AsyncSession = Depends(get_db)):
     results = await product_service.get_many(db)
     products = results["results"]
 
@@ -92,7 +94,7 @@ async def send_products(
 async def mass_create(
     product_count: Annotated[int, Body()],
     category_count: Annotated[int, Body()],
-    db: AsyncSessionLocal = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     import random
     import string
@@ -119,7 +121,10 @@ async def mass_create(
     s = await db.scalars(select(Category.id))
     category_ids = list(s.all())
 
-    products_to_create = [Product(name=get_random_str(), price=random.random(), category_id=get_random_id(category_ids)) for _ in range(product_count)]
+    products_to_create = [
+        Product(name=get_random_str(), price=random.random(), category_id=get_random_id(category_ids))
+        for _ in range(product_count)
+    ]
 
     db.add_all(products_to_create)
     await db.commit()

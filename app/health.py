@@ -29,6 +29,7 @@ async def rabbit_health():
         "rabbitmq": rabbit_status,
     }
 
+
 @health_router.get("/kafka")
 async def kafka_health():
     status = {

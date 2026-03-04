@@ -1,21 +1,24 @@
 import asyncio
 import json
 import logging
+from contextlib import asynccontextmanager
 from typing import Callable
 
 from aiokafka import AIOKafkaConsumer
 
 from app.config import settings
+from app.kafka.consume_handlers import handle_message
 
 logger = logging.getLogger(__name__)
 
 
 class KafkaConsumer:
     def __init__(
-            self,
-            bootstrap_servers: str,
-            topic: str,
-            group_id: str,
+        self,
+        bootstrap_servers: str,
+        topic: str,
+        group_id: str,
+        message_handler: Callable,
     ):
         self.bootstrap_servers = bootstrap_servers
         self.topic = topic
@@ -25,20 +28,19 @@ class KafkaConsumer:
         self.consumer: AIOKafkaConsumer = None
         self._task: asyncio.Task | None = None
         self._running = False
-        self._message_handler: Callable | None = None
+        self._message_handler: Callable = message_handler
 
-    async def start(self, message_handler: Callable | None = None):
+    async def start(self):
         """Start the Kafka consumer with manual commit"""
-        self._message_handler = message_handler
 
         self.consumer = AIOKafkaConsumer(
             self.topic,
             bootstrap_servers=self.bootstrap_servers,
             group_id=self.group_id,
             enable_auto_commit=self.enable_auto_commit,  # False = manual commit
-            auto_offset_reset='earliest',
-            value_deserializer=lambda v: json.loads(v.decode('utf-8')),
-            key_deserializer=lambda k: k.decode('utf-8') if k else None,
+            auto_offset_reset="earliest",
+            value_deserializer=lambda v: json.loads(v.decode("utf-8")),
+            key_deserializer=lambda k: k.decode("utf-8") if k else None,
             max_poll_records=10,  # Process 10 messages at a time
             session_timeout_ms=30000,
             heartbeat_interval_ms=10000,
@@ -51,7 +53,6 @@ class KafkaConsumer:
         self._running = True
         self._task = asyncio.create_task(self._consume_loop())
 
-
     async def _consume_loop(self):
         """Main consumption loop with manual commit"""
         try:
@@ -59,23 +60,21 @@ class KafkaConsumer:
                 if not self._running:
                     break
 
-                try:
-                    logger.info(f"Received message: topic={msg.topic}, "
-                                f"partition={msg.partition}, offset={msg.offset}, "
-                                f"key={msg.key}")
+                logger.info(
+                    f"Received message: topic={msg.topic}, "
+                    f"partition={msg.partition}, offset={msg.offset}, "
+                    f"key={msg.key}"
+                )
 
-                    # Process the message
+                try:
                     if self._message_handler:
                         await self._message_handler(msg)
 
-                    # Manual commit after successful processing
-                    await self.consumer.commit()
-                    logger.debug(f"Committed offset {msg.offset} for partition {msg.partition}")
-
                 except Exception as e:
                     logger.error(f"Error processing message: {e}")
-                    # Don't commit on error - message will be re-processed
-                    # You could add dead letter queue logic here
+                else:
+                    await self.consumer.commit()
+                    logger.debug(f"Committed offset {msg.offset} for partition {msg.partition}")
 
         except Exception as e:
             logger.error(f"Error in consume loop: {e}")
@@ -102,12 +101,6 @@ class KafkaConsumer:
             await self.consumer.commit({(topic, partition): offset})
             logger.info(f"Committed specific offset: {topic}:{partition}:{offset}")
 
-    async def get_committed_offsets(self):
-        """Get current committed offsets for all partitions"""
-        if self.consumer:
-            return await self.consumer.committed()
-        return None
-
     async def seek_to_offset(self, topic: str, partition: int, offset: int):
         """Seek to a specific offset"""
         if self.consumer:
@@ -128,11 +121,21 @@ class KafkaConsumer:
             self.consumer.resume()
             logger.info("Consumer resumed")
 
+
 kafka_consumer = KafkaConsumer(
     settings.KAFKA_BOOTSTRAP_SERVERS,
     settings.KAFKA_TOPIC,
     settings.KAFKA_CONSUMER_GROUP_ID,
+    handle_message,
 )
+
 
 def get_kafka_consumer():
     return kafka_consumer
+
+
+@asynccontextmanager
+async def manage_kafka_consumer():
+    await kafka_consumer.start()
+    yield
+    await kafka_consumer.stop()
