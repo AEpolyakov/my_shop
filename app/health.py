@@ -1,7 +1,10 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.core.session import get_db
+from app.kafka.consumer import kafka_consumer
+from app.kafka.producer import kafka_producer
 
 health_router = APIRouter(prefix="/health")
 
@@ -25,3 +28,24 @@ async def rabbit_health():
         "status": "healthy" if rabbit_status == "connected" else "degraded",
         "rabbitmq": rabbit_status,
     }
+
+
+@health_router.get("/kafka")
+async def kafka_health():
+    status = {
+        "status": "healthy",
+        "producer": False,
+        "consumer": False,
+        "bootstrap_servers": settings.KAFKA_BOOTSTRAP_SERVERS,
+    }
+
+    # Check producer
+    if kafka_producer and kafka_producer.producer:
+        status["producer"] = True
+
+    # Check consumer
+    if kafka_consumer and kafka_consumer.consumer:
+        status["consumer"] = True
+        status["consumer_running"] = kafka_consumer._running
+
+    return status

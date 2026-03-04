@@ -38,62 +38,37 @@ services:
       retries: 5
 
   kafka:
-    image: apache/kafka:latest
+    image: confluentinc/cp-kafka:latest
+    hostname: kafka
     container_name: kafka
     ports:
       - "9092:9092"
+      - "9101:9101"
     environment:
-      # Режим KRaft (без ZooKeeper)
       KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: 'broker,controller'
-      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:9093'
-
-      # Слушатели
-      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093'
-      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092'
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT'
-      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      # Важно: разные listeners для внутреннего и внешнего доступа
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092'
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,PLAINTEXT_HOST://0.0.0.0:9092'
       KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
-
-      # Директории для данных
-      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
-
-      # Топики
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
-
-      # Cluster ID (обязательно для KRaft)
-      CLUSTER_ID: 'Mk3OEYxNjIwNDQ0NTY3OQ=='
-    # Убираем healthcheck или делаем его более простым
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+    volumes:
+      - ./data/kafka:/tmp/kraft-combined-logs
     healthcheck:
-      test: ["CMD", "bash", "-c", "nc -z localhost 9092"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      start_period: 15s
-    networks:
-      - app-network
-    extra_hosts:
-      - "kafka:127.0.0.1"
-
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: kafka-ui
-    ports:
-      - "8080:8080"
-    environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
-      KAFKA_CLUSTERS_0_METRICS_PORT: 9092
-      KAFKA_CLUSTERS_0_READONLY: "false"
-      # Аутентификация (опционально)
-      # KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL: PLAINTEXT
-      # Динамическая конфигурация топиков
-      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: first
-      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://kafka-connect:8083
-    depends_on:
-      kafka:
-        condition: service_healthy
+      test: [ "CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     networks:
       - app-network
 
@@ -104,7 +79,7 @@ services:
     ports:
       - "${APP_PORT}:${APP_PORT}"
     command: >
-      sh -c "poetry run alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT}"
+      sh -c "poetry run alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT} --log-level ${LOG_LEVEL}"
     depends_on:
       db:
         condition: service_healthy
@@ -114,10 +89,6 @@ services:
         condition: service_healthy
     networks:
       - app-network
-    environment:
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      KAFKA_TOPIC: product
-      KAFKA_CONSUMER_GROUP_ID: product_group
 
 volumes:
   postgres_data:
