@@ -69,6 +69,20 @@ jobs:
         done
         echo "Kafka is ready!"
 
+    - name: Show logs if tests failed
+      if: failure()
+      run: |
+        echo "=== Kafka container status ==="
+        docker compose ps kafka
+        echo "=== Kafka logs ==="
+        docker compose logs --tail=100 kafka
+        echo "=== Network configuration ==="
+        docker compose exec kafka cat /etc/hosts
+        docker compose exec kafka ip addr show
+        echo "=== Kafka config ==="
+        docker compose exec kafka cat /etc/kafka/server.properties
+
+
     - name: Wait for PostgreSQL to be ready
       run: |
         timeout 30s bash -c 'until docker compose exec -T db pg_isready -U postgres; do sleep 2; done'
@@ -103,15 +117,6 @@ jobs:
         docker compose logs app
         echo "=== DB container logs ==="
         docker compose logs db
-        echo "=== Kafka container status ==="
-        docker compose ps kafka
-        echo "=== Kafka logs ==="
-        docker compose logs --tail=100 kafka
-        echo "=== Network configuration ==="
-        docker compose exec kafka cat /etc/hosts
-        docker compose exec kafka ip addr show
-        echo "=== Kafka config ==="
-        docker compose exec kafka cat /etc/kafka/server.properties
 
     - name: Stop and remove containers
       if: always()
