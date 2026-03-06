@@ -69,10 +69,35 @@ jobs:
         done
         echo "Kafka is ready!"
 
-    - name: Wait for PostgreSQL to be ready
+    - name: Wait for PostgreSQL to be fully ready
       run: |
-        timeout 30s bash -c 'until docker compose exec -T db pg_isready -U postgres; do sleep 2; done'
-        echo "PostgreSQL is ready!"
+        echo "Waiting for PostgreSQL to be fully ready..."
+        timeout=60
+        counter=0
+        while [ $counter -lt $timeout ]; do
+          # Проверяем через pg_isready
+          if docker compose exec -T db pg_isready -U postgres -d app_db > /dev/null 2>&1; then
+            echo "PostgreSQL is accepting connections"
+            
+            # Дополнительная проверка что БД действительно готова
+            if docker compose exec -T db psql -U postgres -d app_db -c "SELECT 1" > /dev/null 2>&1; then
+              echo "PostgreSQL is fully ready!"
+              
+              # Показываем информацию о БД
+              docker compose exec -T db psql -U postgres -d app_db -c "\l"
+              docker compose exec -T db psql -U postgres -d app_db -c "\conninfo"
+              exit 0
+            fi
+          fi
+          
+          echo "PostgreSQL not ready yet... ($counter/$timeout)"
+          docker compose logs --tail=10 db
+          sleep 3
+          counter=$((counter+3))
+        done
+        echo "PostgreSQL failed to start within timeout"
+        docker compose logs db
+        exit 1
 
     - name: Build and start services with Docker Compose
       run: |
