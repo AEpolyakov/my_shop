@@ -100,10 +100,16 @@ jobs:
       run: |
         docker compose ps
         docker compose logs db
+        
 
-    - name: Run Black (check mode)
+    - name: Lint - Black check
       run: |
-        docker compose exec -T web black --check --diff .
+        poetry run black --check .
+        echo "✅ Lint completed - Black check passed"
+
+#    - name: Run Black (check mode)
+#      run: |
+#        docker compose exec -T web black --check --diff .
 
     - name: Run tests with pytest
       run: |
