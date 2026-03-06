@@ -76,16 +76,16 @@ jobs:
         counter=0
         while [ $counter -lt $timeout ]; do
           # Проверяем через pg_isready
-          if docker compose exec -T db pg_isready -U postgres -d app_db > /dev/null 2>&1; then
+          if docker compose exec -T db pg_isready -U postgres -d my_shop > /dev/null 2>&1; then
             echo "PostgreSQL is accepting connections"
             
             # Дополнительная проверка что БД действительно готова
-            if docker compose exec -T db psql -U postgres -d app_db -c "SELECT 1" > /dev/null 2>&1; then
+            if docker compose exec -T db psql -U postgres -d my_shop -c "SELECT 1" > /dev/null 2>&1; then
               echo "PostgreSQL is fully ready!"
               
               # Показываем информацию о БД
-              docker compose exec -T db psql -U postgres -d app_db -c "\l"
-              docker compose exec -T db psql -U postgres -d app_db -c "\conninfo"
+              docker compose exec -T db psql -U postgres -d my_shop -c "\l"
+              docker compose exec -T db psql -U postgres -d my_shop -c "\conninfo"
               exit 0
             fi
           fi
@@ -115,9 +115,6 @@ jobs:
         docker compose exec -T web black --check --diff .
 
     - name: Run tests with pytest
-      env:
-        DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/app_db
-        TESTING: "True"
       run: |
         docker compose exec -T web pytest -v --asyncio-mode=auto
 
