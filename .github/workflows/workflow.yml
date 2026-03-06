@@ -3,8 +3,6 @@ name: CI
 on:
   push:
     branches: [ main, master, develop, feature/* ]
-  pull_request:
-    branches: [ main, master, develop ]
   workflow_dispatch:
 
 jobs:
@@ -32,6 +30,7 @@ jobs:
         RABBIT_QUEUE=product
         RABBIT_USER=guest
         RABBIT_PASS=guest
+        KAFKA_HOST=kafka
         KAFKA_BOOTSTRAP_SERVERS=kafka:29092
         KAFKA_TOPIC=product
         KAFKA_CONSUMER_GROUP_ID=product_group
