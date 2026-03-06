@@ -18,22 +18,29 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
+    - name: Create .env file for CI
+      run: |
+        cat > .env << EOF
+        APP_PORT=8000
+        LOG_LEVEL=info
+        POSTGRES_PASSWORD=1
+        POSTGRES_DB=my_shop
+        POSTGRES_PORT=5432
+        POSTGRES_USER=myuser
+        POSTGRES_HOST=db
+        RABBIT_PORT=5672
+        RABBIT_QUEUE=product
+        RABBIT_USER=guest
+        RABBIT_PASS=guest
+        KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+        KAFKA_TOPIC=product
+        KAFKA_CONSUMER_GROUP_ID=product_group
+        EOF
+
+        echo "Created .env file:"
+        cat .env
+
     - name: Build and start services with Docker Compose
-      env:
-        APP_PORT: 8000
-        LOG_LEVEL: info
-        POSTGRES_PASSWORD: 1
-        POSTGRES_DB: my_shop
-        POSTGRES_PORT: 5432
-        POSTGRES_USER: myuser
-        POSTGRES_HOST: db
-        RABBIT_PORT: 5672
-        RABBIT_QUEUE: product
-        RABBIT_USER: guest
-        RABBIT_PASS: guest
-        KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-        KAFKA_TOPIC: product
-        KAFKA_CONSUMER_GROUP_ID: product_group
       run: |
         docker compose up -d --build
         # Ждем пока PostgreSQL будет готов
