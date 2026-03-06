@@ -69,6 +69,15 @@ jobs:
         docker compose logs app
         echo "=== DB container logs ==="
         docker compose logs db
+        echo "=== Kafka container status ==="
+        docker compose ps kafka
+        echo "=== Kafka logs ==="
+        docker compose logs --tail=100 kafka
+        echo "=== Network configuration ==="
+        docker compose exec kafka cat /etc/hosts
+        docker compose exec kafka ip addr show
+        echo "=== Kafka config ==="
+        docker compose exec kafka cat /etc/kafka/server.properties
 
     - name: Stop and remove containers
       if: always()
