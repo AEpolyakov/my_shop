@@ -39,10 +39,44 @@ jobs:
         echo "Created .env file:"
         cat .env
 
+    - name: Pull Kafka image separately
+      run: |
+        docker pull confluentinc/cp-kafka:latest
+
+    - name: Start dependencies first (db and kafka)
+      run: |
+        # Запускаем только db и kafka без app
+        docker compose up -d db kafka
+        echo "Waiting for containers to start..."
+        sleep 15
+        docker compose ps
+
+    - name: Wait for Kafka to be ready
+      run: |
+        echo "Waiting for Kafka to be ready..."
+        timeout=60
+        counter=0
+        until docker compose exec -T kafka kafka-topics --bootstrap-server localhost:9092 --list > /dev/null 2>&1; do
+          if [ $counter -eq $timeout ]; then
+            echo "Kafka failed to start within $timeout seconds"
+            docker compose logs kafka
+            exit 1
+          fi
+          echo "Kafka not ready yet... ($counter/$timeout)"
+          docker compose logs --tail=10 kafka
+          sleep 5
+          counter=$((counter+5))
+        done
+        echo "Kafka is ready!"
+
+    - name: Wait for PostgreSQL to be ready
+      run: |
+        timeout 30s bash -c 'until docker compose exec -T db pg_isready -U postgres; do sleep 2; done'
+        echo "PostgreSQL is ready!"
+
     - name: Build and start services with Docker Compose
       run: |
         docker compose up -d --build
-        # Ждем пока PostgreSQL будет готов
         sleep 10
         docker compose ps
 
