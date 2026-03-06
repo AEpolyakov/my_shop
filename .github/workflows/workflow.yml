@@ -77,17 +77,8 @@ jobs:
         while [ $counter -lt $timeout ]; do
           # Проверяем через pg_isready
           if docker compose exec -T db pg_isready -U postgres -d my_shop > /dev/null 2>&1; then
-            echo "PostgreSQL is accepting connections"
-            
-            # Дополнительная проверка что БД действительно готова
-            if docker compose exec -T db psql -U postgres -d my_shop -c "SELECT 1" > /dev/null 2>&1; then
-              echo "PostgreSQL is fully ready!"
-              
-              # Показываем информацию о БД
-              docker compose exec -T db psql -U postgres -d my_shop -c "\l"
-              docker compose exec -T db psql -U postgres -d my_shop -c "\conninfo"
-              exit 0
-            fi
+            echo "PostgreSQL is accepting connections"       
+            exit 0
           fi
           
           echo "PostgreSQL not ready yet... ($counter/$timeout)"
