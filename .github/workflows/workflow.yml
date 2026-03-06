@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master, develop, feature/* ]
+  workflow_dispatch:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Create .env file for CI
+      run: |
+        cat > .env << EOF
+        APP_PORT=8000
+        LOG_LEVEL=info
+        POSTGRES_DB=my_shop
+        POSTGRES_PORT=5432
+        POSTGRES_USER=postgres
+        POSTGRES_PASSWORD=postgres
+        POSTGRES_HOST=db
+        RABBIT_PORT=5672
+        RABBIT_QUEUE=product
+        RABBIT_USER=guest
+        RABBIT_PASS=guest
+        KAFKA_HOST=kafka
+        KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+        KAFKA_TOPIC=product
+        KAFKA_CONSUMER_GROUP_ID=product_group
+        EOF
+
+        echo "Created .env file:"
+        cat .env
+
+    - name: Pull Kafka image separately
+      run: |
+        docker pull confluentinc/cp-kafka:latest
+
+    - name: Start dependencies first (db and kafka)
+      run: |
+        # Запускаем только db и kafka без app
+        docker compose up -d db kafka
+        echo "Waiting for containers to start..."
+        sleep 15
+        docker compose ps
+
+    - name: Wait for Kafka to be ready
+      run: |
+        echo "Waiting for Kafka to be ready..."
+        timeout=60
+        counter=0
+        until docker compose exec -T kafka kafka-topics --bootstrap-server localhost:9092 --list > /dev/null 2>&1; do
+          if [ $counter -eq $timeout ]; then
+            echo "Kafka failed to start within $timeout seconds"
+            docker compose logs kafka
+            exit 1
+          fi
+          echo "Kafka not ready yet... ($counter/$timeout)"
+          docker compose logs --tail=10 kafka
+          sleep 5
+          counter=$((counter+5))
+        done
+        echo "Kafka is ready!"
+
+    - name: Wait for PostgreSQL to be fully ready
+      run: |
+        echo "Waiting for PostgreSQL to be fully ready..."
+        timeout=60
+        counter=0
+        while [ $counter -lt $timeout ]; do
+          # Проверяем через pg_isready
+          if docker compose exec -T db pg_isready -U postgres -d my_shop > /dev/null 2>&1; then
+            echo "PostgreSQL is accepting connections"       
+            exit 0
+          fi
+          
+          echo "PostgreSQL not ready yet... ($counter/$timeout)"
+          docker compose logs --tail=10 db
+          sleep 3
+          counter=$((counter+3))
+        done
+        echo "PostgreSQL failed to start within timeout"
+        docker compose logs db
+        exit 1
+
+    - name: Build and start services with Docker Compose
+      run: |
+        docker compose up -d --build
+        sleep 10
+        docker compose ps
+
+    - name: Check if containers are running
+      run: |
+        docker compose ps
+        docker compose logs db
+        
+
+    - name: Lint - Black check
+      run: |
+        poetry run black --check .
+        echo "✅ Lint completed - Black check passed"
+
+#    - name: Run Black (check mode)
+#      run: |
+#        docker compose exec -T web black --check --diff .
+
+    - name: Run tests with pytest
+      run: |
+        docker compose exec -T web pytest -v --asyncio-mode=auto
+
+    - name: Show logs if tests failed
+      if: failure()
+      run: |
+        echo "=== App container logs ==="
+        docker compose logs app
+        echo "=== DB container logs ==="
+        docker compose logs db
+
+    - name: Stop and remove containers
+      if: always()
+      run: docker compose down -v
