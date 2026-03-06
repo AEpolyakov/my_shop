@@ -20,6 +20,8 @@ jobs:
 
     - name: Build and start services with Docker Compose
       env:
+        APP_PORT: 8000
+        LOG_LEVEL: info
         POSTGRES_PASSWORD: 1
         POSTGRES_DB: my_shop
         POSTGRES_PORT: 5432
