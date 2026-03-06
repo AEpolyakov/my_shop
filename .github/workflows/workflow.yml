@@ -87,14 +87,14 @@ jobs:
 
     - name: Run Black (check mode)
       run: |
-        docker compose exec -T black --check --diff .
+        docker compose exec -T web black --check --diff .
 
     - name: Run tests with pytest
       env:
         DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/app_db
         TESTING: "True"
       run: |
-        docker compose exec -T app pytest -v --asyncio-mode=auto
+        docker compose exec -T web pytest -v --asyncio-mode=auto
 
     - name: Show logs if tests failed
       if: failure()
